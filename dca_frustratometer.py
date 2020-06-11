@@ -1,15 +1,23 @@
+#Commentor: Hana Jaafari
+#Date: June 24, 2019
+#The objective of this script is to calculate the frustrated regions of proteins using their DCA energy.
+#Filepaths may vary than the github file.
+
 import random
 import numpy
 import os.path
 import argparse
+import shutil
 
-scratchdir='/scratch/bs25'
-basedir='/home/bs25'
+#HJ: I have edited these for my own path ways in Nots.
+#scratchdir='/scratch/hkj1'
+homedir="/Users/hanajaafari/Desktop"
+basedir=os.path.join(homedir,"dca-frustratometer-master")
 
 def get_pfamID(pdbID, chain):
     import pandas as pd
-    df = pd.read_table('%s/dca-frustratometer/pdb_chain_pfam.lst.txt' % basedir, header=1)
-    if sum((df['PDB'] == pdbID.lower()) & (df['CHAIN'] == chain.upper())) != 0:
+    df = pd.read_table('%s/pdb_chain_pfam.lst.txt' % basedir, header=1)
+    if sum((df['PDB'] == pdbID.lower()) & (df['CHAIN'] == chain.upper())) != 0: #HJ: Here ".upper()" capitilizes the string
         pfamID=df.loc[(df['PDB'] == pdbID.lower()) & (df['CHAIN'] == chain.upper())]["PFAM_ID"].values[0]
     else:
         print('cant find pfamID')
@@ -26,8 +34,8 @@ def get_uniprotID(pdbID, chain):
 
 def get_pfam_map(pdbID, chain):
     import pandas as pd
-    df = pd.read_table('%s/dca-frustratometer/pdb_pfam_map.txt' % basedir, header=0)
-    if sum((df['PDB_ID'] == pdbID.upper()) & (df['CHAIN_ID'] == chain.upper())) != 0:
+    df = pd.read_table('%s/pdb_pfam_map.txt' % basedir, header=0)
+    if sum((df['PDB_ID'] == pdbID.upper()) & (df['CHAIN_ID'] == chain.upper())) != 0: 
         start=df.loc[(df['PDB_ID'] == pdbID.upper()) & (df['CHAIN_ID'] == chain.upper())]["PdbResNumStart"].values[0]
         end=df.loc[(df['PDB_ID'] == pdbID.upper()) & (df['CHAIN_ID'] == chain.upper())]["PdbResNumEnd"].values[0]
     else:
@@ -35,14 +43,15 @@ def get_pfam_map(pdbID, chain):
         pfamID='null'
     return int(start), int(end)
 
+#HJ: I had to modify this because "urllib.urlretrieve" is depreciated in Python3.
 def download_pfam(pfamID):
     import urllib
-    urllib.urlretrieve('http://pfam.xfam.org/family/%s/alignment/full' % pfamID, "%s%s.stockholm" % (directory, pfamID))
+    urllib.request.urlretrieve('http://pfam.xfam.org/family/%s/alignment/full' % pfamID, "%s%s.stockholm" % (directory, pfamID))
 
-
+#HJ: I had to modify this because "urllib.urlretrieve" is depreciated in Python3.
 def download_pdb(pdbID):
     import urllib
-    urllib.urlretrieve('http://www.rcsb.org/pdb/files/%s.pdb' % pdbID, "%s%s.pdb" % (directory, pdbID))
+    urllib.request.urlretrieve('http://www.rcsb.org/pdb/files/%s.pdb' % pdbID, "%s%s.pdb" % (directory, pdbID))
 
 def stockholm2fasta(pfamID):
     from Bio import AlignIO
@@ -61,18 +70,23 @@ def filter_fasta(gap_threshold, pfamID, pdbID, chain, seq, resnos):
     #gap_threshold=0.25
     pfam_start, pfam_end = get_pfam_map(pdbID, chain)
     mapped_seq = seq[resnos.index(pfam_start):resnos.index(pfam_end)+1]
-
+    print(mapped_seq)
     #print mapped fasta file
     f = open('%s%s%s_pfam_mapped.fasta' % (directory, pdbID, chain), 'w')
     f.write('>%s:%s pdb mapped to pfam\n' % (pdbID, chain))
     f.write(mapped_seq)
     f.close()
+    
+    shutil.copy("%s%s.fasta"%(directory,pfamID),"%s%s_muscle.fasta"%(directory,pfamID))
+    with open("%s%s_muscle.fasta"%(directory,pfamID),"a") as f:
+        f.write('>%s:%s pdb mapped to pfam\n' % (pdbID, chain))
+        f.write(mapped_seq)
+    #HJ: MUSCLE is a MSA tool. I modified the arguments according to those available to the python script.
+    submit=("%s/MUSCLE/muscle3.8.31_i86darwin64 -profile -in1 %s%s.fasta -in2 %s%s%s_pfam_mapped.fasta -out %s%s%s.fasta" % (homedir, directory,pfamID,directory,pdbID,chain,directory,pdbID,chain))
 
-    submit=("%s/dca-frustratometer/muscle3.8.31_i86linux64 -profile -in1 %s%s.fasta -in2 %s%s%s_pfam_mapped.fasta -out %s%s%s.fasta" % (basedir, directory,pfamID,directory,pdbID,chain,directory,pdbID,chain))
+    print(submit)
 
-    #print(submit)
-
-    process = subprocess.Popen(submit.split(), stdout=subprocess.PIPE)
+    process = subprocess.Popen(submit.split(), stdout=subprocess.PIPE) #HJ: Apparently ".Popen" requires the ".split()" command.
     process.communicate()
     
     # Filter sequences based on gaps in input sequence and gap threshold
@@ -89,12 +103,14 @@ def filter_fasta(gap_threshold, pfamID, pdbID, chain, seq, resnos):
     for i, record in enumerate(alignment):
             record_array = numpy.array([list(record.seq)], numpy.character)
             aligned_sequence = record_array[bools]
-            if float(sum(aligned_sequence=='-'))/len(aligned_sequence) < gap_threshold:
+            aligned_sequence=aligned_sequence[0][0]
+            if float(sum(aligned_sequence.astype('U13')=='-'))/len(aligned_sequence) < gap_threshold:
                     output_handle.write(">%s\n" % record.id + "".join(aligned_sequence).upper()+'\n')
                     sequences_passed_threshold += 1
     output_handle.close()
 
-    fastaseq=''.join(target_array[bools]).upper()
+    fastaseq=''.join([str(i) for i in target_array if i!='=']).upper()
+    print(fastaseq)
     
     stat_output = open(stat_output_file_name, "w")
     stat_output.write("FASTA_alignments " + str(len(alignment)) + "\n")
@@ -118,11 +134,11 @@ def calc_plm(pdbID):
     nr_of_cores=1
     outputDistribution=("%soutputDistribution.%s" % (directory, pdbID))
     outputMatrix=("%soutputMatrix.%s" % (directory, pdbID))
-
-    eng.addpath('%s/dca-frustratometer/plm' % basedir, nargout=0)
-    eng.addpath('%s/dca-frustratometer/plm/functions' % basedir , nargout=0)
-    eng.addpath('%s/dca-frustratometer/plm/3rd_party_code/minFunc' % basedir, nargout=0)
-    eng.plmDCA_symmetric_mod7(fastafile,outputfile,lambda_h,lambda_J,reweighting_threshold,nr_of_cores,
+    #HJ: I modified these file paths and changed the matlab script (symmetric and asymmetric versions are identitical, but the latter is faster)
+    eng.addpath('%s/plmDCA_asymmetric_v2_with_h' % basedir, nargout=0)
+    eng.addpath('%s/plmDCA_asymmetric_v2_with_h/functions' % basedir , nargout=0)
+    eng.addpath('%s/plmDCA_asymmetric_v2_with_h/3rd_party_code/minFunc' % basedir, nargout=0)
+    eng.plmDCA_asymmetric(fastafile,outputfile,lambda_h,lambda_J,reweighting_threshold,nr_of_cores,
                               outputDistribution,outputMatrix, nargout=0)#, stdout=out )
 
 
@@ -162,7 +178,7 @@ def three2one(prot):
 
     newprot = ""
     for a in prot:
-        newprot += code.get(a, "?")
+        newprot += code.get(a, "?") #HJ: Here the "?" is a default value if the key is missing.
 
     return newprot
 
@@ -173,12 +189,12 @@ def calc_distances(pdbID, chainID):
     from Bio.PDB.PDBExceptions import PDBConstructionWarning
     warnings.simplefilter('ignore', PDBConstructionWarning)
 
-    p = PDBParser(PERMISSIVE=1)
+    p = PDBParser(PERMISSIVE=1) #HJ: Remember in Python3, True=1. This command will allow exceptions to be caught, though residues will be missing. These exceptions are due to issues in the PDB file.
     struct_id = pdbID
 
     filename = directory + struct_id + ".pdb"
 
-    s = p.get_structure(struct_id, filename)
+    s = p.get_structure(struct_id, filename) #HJ: This command will return the structure.
     chains = s[0].get_list()
     sequence = []
     dis = []
@@ -204,7 +220,7 @@ def calc_distances(pdbID, chainID):
 
     number_of_pdb_amino_acids = len(all_res)
     native_distances = numpy.zeros((number_of_pdb_amino_acids, number_of_pdb_amino_acids))
-
+    #HJ: This creates a matrix of distances between the residues "CA" coordinates within the chosen chain.
     for i in range(0, len(all_res)):
         dis.append([]);
         ires = all_res[i]
@@ -436,10 +452,10 @@ max_distance_threshold=9.5
 pdbID = args.pdbID#'5pti'
 chain = args.chain#'a'
 
-directory = ('%s/dca-frustratometer/automated/%s%s/' % (scratchdir, pdbID, chain))
+directory = ('%s/dca-frustratometer/automated/%s%s/' % (os.getcwd(), pdbID, chain))
 if not os.path.exists(directory):
     os.makedirs(directory)
-    
+#HJ: Here the output files are named.    
 configurational_frustration_output_file_name=("%sconfigurational_frust_output.%s" % (directory, pdbID))
 mutational_frustration_output_file_name=("%smutatational_frust_output.%s" % (directory, pdbID))
 single_residue_frustration_output_file_name=("%ssing_frust_output.%s" % (directory, pdbID))
