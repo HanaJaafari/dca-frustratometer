@@ -9,6 +9,7 @@ scratchdir=f'{basedir}/scratch'
 
 def get_pfamID(pdbID, chain):
     import pandas as pd
+    #ftp://ftp.ebi.ac.uk/pub/databases/msd/sifts/flatfiles/csv/pdb_chain_pfam.csv.gz
     df = pd.read_csv('%s/pdb_chain_pfam.csv' % basedir, header=1)
     if sum((df['PDB'] == pdbID.lower()) & (df['CHAIN'] == chain.upper())) != 0:
         pfamID=df.loc[(df['PDB'] == pdbID.lower()) & (df['CHAIN'] == chain.upper())]["PFAM_ID"].values[0]
@@ -27,6 +28,7 @@ def get_uniprotID(pdbID, chain):
 
 def get_pfam_map(pdbID, chain):
     import pandas as pd
+    #ftp://ftp.ebi.ac.uk/pub/databases/Pfam/mappings/pdb_pfam_mapping.txt
     df = pd.read_table('%s/pdb_pfam_mapping.txt' % basedir, header=0)
     if sum((df['PDB_ID'] == pdbID.upper()) & (df['CHAIN_ID'] == chain.upper())) != 0:
         start=df.loc[(df['PDB_ID'] == pdbID.upper()) & (df['CHAIN_ID'] == chain.upper())]["PdbResNumStart"].values[0]
