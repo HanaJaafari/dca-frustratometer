@@ -19,8 +19,8 @@ def get_pfamID(pdbID, chain):
     return(pfamID)
 
 def get_uniprotID(pdbID, chain):
-    import urllib2
-    response = urllib2.urlopen('http://www.bioinf.org.uk/cgi-bin/pdbsws/query.pl?plain=1&qtype=pdb&id=%s&chain=%s' % (pdbID, chain))
+    import urllib.request
+    response = urllib.request.urlopen('http://www.bioinf.org.uk/cgi-bin/pdbsws/query.pl?plain=1&qtype=pdb&id=%s&chain=%s' % (pdbID, chain))
     html = response.read()
     info=html.split('\n')
     uniprotID=info[3].split(' ')[1]
@@ -39,13 +39,13 @@ def get_pfam_map(pdbID, chain):
     return int(start), int(end)
 
 def download_pfam(pfamID):
-    import urllib
-    urllib.urlretrieve('http://pfam.xfam.org/family/%s/alignment/full' % pfamID, "%s%s.stockholm" % (directory, pfamID))
+    import urllib.request
+    urllib.request.urlretrieve('http://pfam.xfam.org/family/%s/alignment/full' % pfamID, "%s%s.stockholm" % (directory, pfamID))
 
 
 def download_pdb(pdbID):
-    import urllib
-    urllib.urlretrieve('http://www.rcsb.org/pdb/files/%s.pdb' % pdbID, "%s%s.pdb" % (directory, pdbID))
+    import urllib.request
+    urllib.request.urlretrieve('http://www.rcsb.org/pdb/files/%s.pdb' % pdbID, "%s%s.pdb" % (directory, pdbID))
 
 def stockholm2fasta(pfamID):
     from Bio import AlignIO
@@ -87,17 +87,17 @@ def filter_fasta(gap_threshold, pfamID, pdbID, chain, seq, resnos):
 
     output_handle = open("%s%s_msa_filtered.fasta" % (directory, pdbID), "w")
     target_array = numpy.array([list(targetseq)], numpy.character)
-    bools = target_array != '-'
+    bools = target_array != b'-'
     sequences_passed_threshold = 0
     for i, record in enumerate(alignment):
             record_array = numpy.array([list(record.seq)], numpy.character)
             aligned_sequence = record_array[bools]
-            if float(sum(aligned_sequence=='-'))/len(aligned_sequence) < gap_threshold:
-                    output_handle.write(">%s\n" % record.id + "".join(aligned_sequence).upper()+'\n')
+            if float(sum(aligned_sequence==b'-'))/len(aligned_sequence) < gap_threshold:
+                    output_handle.write(">%s\n" % record.id + aligned_sequence.tostring().upper().decode("utf-8") +'\n')
                     sequences_passed_threshold += 1
     output_handle.close()
 
-    fastaseq=''.join(target_array[bools]).upper()
+    fastaseq=target_array.tostring().upper().decode("utf-8")
     
     stat_output = open(stat_output_file_name, "w")
     stat_output.write("FASTA_alignments " + str(len(alignment)) + "\n")
