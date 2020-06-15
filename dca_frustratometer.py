@@ -284,8 +284,8 @@ def evaluate_configurational_frustration(sequence, number_of_decoys, number_of_r
                     decoy_distance = max_distance_threshold + 1.0
                     while decoy_distance > max_distance_threshold:
                         # Draw random indices based on number of pdb residues
-                        i_sequence_index = random.choice(dca_indices)
-                        j_sequence_index = random.choice(dca_indices)
+                        i_decoy,i_sequence_index=random.choice(list(enumerate(dca_indices)))
+                        j_decoy,j_sequence_index=random.choice(list(enumerate(dca_indices)))
                         # Choose the pdb indices based on those random indices
                         i_sequence_index_pdb = map_to_pdb[i_sequence_index]
                         j_sequence_index_pdb = map_to_pdb[j_sequence_index]
