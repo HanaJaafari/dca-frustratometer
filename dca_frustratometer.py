@@ -71,7 +71,7 @@ def filter_fasta(gap_threshold, pfamID, pdbID, chain, seq, resnos):
     f.write(mapped_seq)
     f.close()
 
-    submit=("%s/muscle3.8.31_i86linux64 -profile -in1 %s%s.fasta -in2 %s%s%s_pfam_mapped.fasta -out %s%s%s.fasta" % (basedir, directory,pfamID,directory,pdbID,chain,directory,pdbID,chain))
+    submit=("muscle -profile -in1 %s%s.fasta -in2 %s%s%s_pfam_mapped.fasta -out %s%s%s.fasta" % (directory,pfamID,directory,pdbID,chain,directory,pdbID,chain))
 
     #print(submit)
 
@@ -125,7 +125,11 @@ def calc_plm(pdbID):
     eng.addpath('%s/plm' % basedir, nargout=0)
     eng.addpath('%s/plm/functions' % basedir , nargout=0)
     eng.addpath('%s/plm/3rd_party_code/minFunc' % basedir, nargout=0)
-    eng.plmDCA_symmetric_mod7(fastafile,outputfile,lambda_h,lambda_J,reweighting_threshold,nr_of_cores,
+    print('plmDCA_symmetric_mod7',fastafile,outputfile,
+          lambda_h,lambda_J,reweighting_threshold,nr_of_cores,
+          outputDistribution,outputMatrix)
+    eng.plmDCA_symmetric_mod7(fastafile,outputfile,lambda_h,lambda_J,
+                              reweighting_threshold,nr_of_cores,
                               outputDistribution,outputMatrix, nargout=0)#, stdout=out )
 
 
