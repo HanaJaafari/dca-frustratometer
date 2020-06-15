@@ -3,12 +3,13 @@ import numpy
 import os.path
 import argparse
 
-scratchdir='/scratch/bs25'
-basedir='/home/bs25'
+from pathlib import Path
+basedir=Path(__file__).parent.absolute()
+scratchdir=f'{basedir}/scratch'
 
 def get_pfamID(pdbID, chain):
     import pandas as pd
-    df = pd.read_csv('%s/dca-frustratometer/pdb_chain_pfam.csv' % basedir, header=1)
+    df = pd.read_csv('%s/pdb_chain_pfam.csv' % basedir, header=1)
     if sum((df['PDB'] == pdbID.lower()) & (df['CHAIN'] == chain.upper())) != 0:
         pfamID=df.loc[(df['PDB'] == pdbID.lower()) & (df['CHAIN'] == chain.upper())]["PFAM_ID"].values[0]
     else:
@@ -26,7 +27,7 @@ def get_uniprotID(pdbID, chain):
 
 def get_pfam_map(pdbID, chain):
     import pandas as pd
-    df = pd.read_table('%s/dca-frustratometer/pdb_pfam_mapping.txt' % basedir, header=0)
+    df = pd.read_table('%s/pdb_pfam_mapping.txt' % basedir, header=0)
     if sum((df['PDB_ID'] == pdbID.upper()) & (df['CHAIN_ID'] == chain.upper())) != 0:
         start=df.loc[(df['PDB_ID'] == pdbID.upper()) & (df['CHAIN_ID'] == chain.upper())]["PdbResNumStart"].values[0]
         end=df.loc[(df['PDB_ID'] == pdbID.upper()) & (df['CHAIN_ID'] == chain.upper())]["PdbResNumEnd"].values[0]
@@ -68,7 +69,7 @@ def filter_fasta(gap_threshold, pfamID, pdbID, chain, seq, resnos):
     f.write(mapped_seq)
     f.close()
 
-    submit=("%s/dca-frustratometer/muscle3.8.31_i86linux64 -profile -in1 %s%s.fasta -in2 %s%s%s_pfam_mapped.fasta -out %s%s%s.fasta" % (basedir, directory,pfamID,directory,pdbID,chain,directory,pdbID,chain))
+    submit=("%s/muscle3.8.31_i86linux64 -profile -in1 %s%s.fasta -in2 %s%s%s_pfam_mapped.fasta -out %s%s%s.fasta" % (basedir, directory,pfamID,directory,pdbID,chain,directory,pdbID,chain))
 
     #print(submit)
 
@@ -119,9 +120,9 @@ def calc_plm(pdbID):
     outputDistribution=("%soutputDistribution.%s" % (directory, pdbID))
     outputMatrix=("%soutputMatrix.%s" % (directory, pdbID))
 
-    eng.addpath('%s/dca-frustratometer/plm' % basedir, nargout=0)
-    eng.addpath('%s/dca-frustratometer/plm/functions' % basedir , nargout=0)
-    eng.addpath('%s/dca-frustratometer/plm/3rd_party_code/minFunc' % basedir, nargout=0)
+    eng.addpath('%s/plm' % basedir, nargout=0)
+    eng.addpath('%s/plm/functions' % basedir , nargout=0)
+    eng.addpath('%s/plm/3rd_party_code/minFunc' % basedir, nargout=0)
     eng.plmDCA_symmetric_mod7(fastafile,outputfile,lambda_h,lambda_J,reweighting_threshold,nr_of_cores,
                               outputDistribution,outputMatrix, nargout=0)#, stdout=out )
 
