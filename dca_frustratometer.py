@@ -8,7 +8,7 @@ basedir='/home/bs25'
 
 def get_pfamID(pdbID, chain):
     import pandas as pd
-    df = pd.read_table('%s/dca-frustratometer/pdb_chain_pfam.lst.txt' % basedir, header=1)
+    df = pd.read_csv('%s/dca-frustratometer/pdb_chain_pfam.csv' % basedir, header=1)
     if sum((df['PDB'] == pdbID.lower()) & (df['CHAIN'] == chain.upper())) != 0:
         pfamID=df.loc[(df['PDB'] == pdbID.lower()) & (df['CHAIN'] == chain.upper())]["PFAM_ID"].values[0]
     else:
@@ -26,7 +26,7 @@ def get_uniprotID(pdbID, chain):
 
 def get_pfam_map(pdbID, chain):
     import pandas as pd
-    df = pd.read_table('%s/dca-frustratometer/pdb_pfam_map.txt' % basedir, header=0)
+    df = pd.read_table('%s/dca-frustratometer/pdb_pfam_mapping.txt' % basedir, header=0)
     if sum((df['PDB_ID'] == pdbID.upper()) & (df['CHAIN_ID'] == chain.upper())) != 0:
         start=df.loc[(df['PDB_ID'] == pdbID.upper()) & (df['CHAIN_ID'] == chain.upper())]["PdbResNumStart"].values[0]
         end=df.loc[(df['PDB_ID'] == pdbID.upper()) & (df['CHAIN_ID'] == chain.upper())]["PdbResNumEnd"].values[0]
