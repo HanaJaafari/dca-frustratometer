@@ -416,237 +416,237 @@ def evaluate_singleres_native_energy(i_dca, i_pdb, amino_acid_i, sequence):
     return total_energy
 
 ########MAIN PROGRAM##########
+if __name__=='__main__':
+    # Parse arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("pdbID", help="id of pdb")
+    parser.add_argument("chain", help="chain id of pdb")
+    args = parser.parse_args()
 
-# Parse arguments
-parser = argparse.ArgumentParser()
-parser.add_argument("pdbID", help="id of pdb")
-parser.add_argument("chain", help="chain id of pdb")
-args = parser.parse_args()
+    #Parameters for frustration calculations
+    randomize_amino_acid_types=True
+    randomize_indices=True
+    include_fields=True
+    compute_configurational_frustration=True
+    compute_mutational_frustration=True
+    compute_single_residue_frustration=True
+    n_decoys=5000
+    minimum_sequence_separation=2
+    max_distance_threshold=9.5
 
-#Parameters for frustration calculations
-randomize_amino_acid_types=True
-randomize_indices=True
-include_fields=True
-compute_configurational_frustration=True
-compute_mutational_frustration=True
-compute_single_residue_frustration=True
-n_decoys=5000
-minimum_sequence_separation=2
-max_distance_threshold=9.5
+    pdbID = args.pdbID#'5pti'
+    chain = args.chain#'a'
 
-pdbID = args.pdbID#'5pti'
-chain = args.chain#'a'
+    directory = ('%s/dca-frustratometer/automated/%s%s/' % (scratchdir, pdbID, chain))
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        
+    configurational_frustration_output_file_name=("%sconfigurational_frust_output.%s" % (directory, pdbID))
+    mutational_frustration_output_file_name=("%smutatational_frust_output.%s" % (directory, pdbID))
+    single_residue_frustration_output_file_name=("%ssing_frust_output.%s" % (directory, pdbID))
+    stat_output_file_name = ("%s%s.info" % (directory, pdbID))
+    status_file_name = ("%s%s.status" % (directory, pdbID))
 
-directory = ('%s/dca-frustratometer/automated/%s%s/' % (scratchdir, pdbID, chain))
-if not os.path.exists(directory):
-    os.makedirs(directory)
-    
-configurational_frustration_output_file_name=("%sconfigurational_frust_output.%s" % (directory, pdbID))
-mutational_frustration_output_file_name=("%smutatational_frust_output.%s" % (directory, pdbID))
-single_residue_frustration_output_file_name=("%ssing_frust_output.%s" % (directory, pdbID))
-stat_output_file_name = ("%s%s.info" % (directory, pdbID))
-status_file_name = ("%s%s.status" % (directory, pdbID))
+    status_output = open(status_file_name, "w")
 
-status_output = open(status_file_name, "w")
+    #get the pfam and uniprot ID from the pdb info
+    pfamID = get_pfamID(pdbID, chain)
+    #uniprotID = get_uniprotID(pdbID, chain)
 
-#get the pfam and uniprot ID from the pdb info
-pfamID = get_pfamID(pdbID, chain)
-#uniprotID = get_uniprotID(pdbID, chain)
+    status_output.write("pdbID: " + pdbID + "\n")
+    print("pdbID: " + pdbID + "\n")
+    status_output.write("pfamID: " + pfamID + "\n")
+    print("pfamID: " + pfamID + "\n")
+    #status_output.write("uniprotID: " + uniprotID + "\n")
+    #print("uniprotID: " + uniprotID + "\n")
 
-status_output.write("pdbID: " + pdbID + "\n")
-print("pdbID: " + pdbID + "\n")
-status_output.write("pfamID: " + pfamID + "\n")
-print("pfamID: " + pfamID + "\n")
-#status_output.write("uniprotID: " + uniprotID + "\n")
-#print("uniprotID: " + uniprotID + "\n")
-
-#download pdb file if it doesn't exist
-if os.path.isfile(directory + pdbID + '.pdb') == False:
-    download_pdb(pdbID)
-    status_output.write("PDB downloaded" + "\n")
-    print("PDB downloaded" + "\n")
-
-
-#download pfam msa if it doesn't exist
-if os.path.isfile(directory + pfamID + '.stockholm') == False:
-    download_pfam(pfamID)
-    status_output.write("Pfam MSA downloaded" + "\n")
-    print("Pfam MSA downloaded" + "\n")
-
-if os.path.isfile(directory + pfamID + '.fasta') == False:
-    stockholm2fasta(pfamID)
-    status_output.write("stockholm coverted" + "\n")
-    print("stockholm coverted" + "\n")
-
-#obtain information from PDB file (pairwise separation(native_distances) and pdb_sequences)
-native_distances, pdb_sequence, resnos, pdb_start = calc_distances(pdbID, chain)
-
-#filter sequences and get the target sequence and number of sequences remaining in the alignment
-#set filter threshold
-filter_threshold = 0.25
-msa_query_sequence, n_sequences = filter_fasta(filter_threshold, pfamID, pdbID, chain, pdb_sequence, resnos)
-status_output.write("FASTA filtered" + "\n")
-print("FASTA filtered" + "\n")
-
-#run the plm calculation which saves appropriate files
-if os.path.isfile("%soutputMatrix.%s" % (directory, pdbID)) == False:
-    calc_plm(pdbID)
-    status_output.write("PLM computed" + "\n")
-    print("PLM computed" + "\n")
-
-#read in plm calculations fields and couplings
-fields, couplings = read_dca(pdbID)
-
-#map the fasta sequence on to the sequence of the pdb file
-dca_indices, pdb_indices, map_to_dca,map_to_pdb, number_of_residues = map_fasta_to_pdb(pdb_sequence, msa_query_sequence)
-status_output.write("parameter initialization complete" + "\n")
-print("parameter initialization complete" + "\n")
+    #download pdb file if it doesn't exist
+    if os.path.isfile(directory + pdbID + '.pdb') == False:
+        download_pdb(pdbID)
+        status_output.write("PDB downloaded" + "\n")
+        print("PDB downloaded" + "\n")
 
 
-#print some frustratometer statistics
-stat_output = open(stat_output_file_name, "a")
-stat_output.write("msa_query_sequence " + msa_query_sequence + "\n")
-stat_output.write("msa_query_sequence_length " + str(len(msa_query_sequence)) + "\n")
-stat_output.write("pdb_sequence " + pdb_sequence + "\n")
-stat_output.write("pdb_sequence_length " + str(len(pdb_sequence)) + "\n")
-stat_output.close()
+    #download pfam msa if it doesn't exist
+    if os.path.isfile(directory + pfamID + '.stockholm') == False:
+        download_pfam(pfamID)
+        status_output.write("Pfam MSA downloaded" + "\n")
+        print("Pfam MSA downloaded" + "\n")
 
-# Define parameters
-number_of_amino_acid_types = 21
-amino_acid_type_dictionary = {
-'-':0,
-'A':1,
-'C':2,
-'D':3,
-'E':4,
-'F':5,
-'G':6,
-'H':7,
-'I':8,
-'K':9,
-'L':10,
-'M':11,
-'N':12,
-'P':13,
-'Q':14,
-'R':15,
-'S':16,
-'T':17,
-'V':18,
-'W':19,
-'Y':20,
-'X':0
-}
+    if os.path.isfile(directory + pfamID + '.fasta') == False:
+        stockholm2fasta(pfamID)
+        status_output.write("stockholm coverted" + "\n")
+        print("stockholm coverted" + "\n")
+
+    #obtain information from PDB file (pairwise separation(native_distances) and pdb_sequences)
+    native_distances, pdb_sequence, resnos, pdb_start = calc_distances(pdbID, chain)
+
+    #filter sequences and get the target sequence and number of sequences remaining in the alignment
+    #set filter threshold
+    filter_threshold = 0.25
+    msa_query_sequence, n_sequences = filter_fasta(filter_threshold, pfamID, pdbID, chain, pdb_sequence, resnos)
+    status_output.write("FASTA filtered" + "\n")
+    print("FASTA filtered" + "\n")
+
+    #run the plm calculation which saves appropriate files
+    if os.path.isfile("%soutputMatrix.%s" % (directory, pdbID)) == False:
+        calc_plm(pdbID)
+        status_output.write("PLM computed" + "\n")
+        print("PLM computed" + "\n")
+
+    #read in plm calculations fields and couplings
+    fields, couplings = read_dca(pdbID)
+
+    #map the fasta sequence on to the sequence of the pdb file
+    dca_indices, pdb_indices, map_to_dca,map_to_pdb, number_of_residues = map_fasta_to_pdb(pdb_sequence, msa_query_sequence)
+    status_output.write("parameter initialization complete" + "\n")
+    print("parameter initialization complete" + "\n")
 
 
-# Compute and write out configurational frustration indices
-target = open(("%s%s_configurational_frustration.tcl" % (directory, pdbID)), 'w')
-atomselect=0
-if compute_configurational_frustration:
-    status_output.write("Computing configurational frustration...\n")
-    print("Computing configurational frustration...\n")
-    configurational_native_totals, configurational_decoy_means, configurational_decoy_stds, configurational_frustration_indices = evaluate_configurational_frustration(msa_query_sequence, n_decoys, number_of_residues)
-    configurational_frustration_output_file = open(configurational_frustration_output_file_name, "w")
-    for i in range(number_of_residues):
-        for j in range(i+minimum_sequence_separation, number_of_residues):
-            if native_distances[pdb_indices[i], pdb_indices[j]] < max_distance_threshold:
-                configurational_frustration_output_file.write("%4d %s %4d %s %8.2f %8.2f %8.2f %8.2f \n" % (pdb_indices[i]+pdb_start,
-                                                                                                     msa_query_sequence[dca_indices[i]],
-                                                                                                     pdb_indices[j]+pdb_start,
-                                                                                                     msa_query_sequence[dca_indices[j]],
-                                                                                                     configurational_native_totals[i, j],
-                                                                                                     configurational_decoy_means[i, j],
-                                                                                                     configurational_decoy_stds[i, j],
-                                                                                                     configurational_frustration_indices[i, j]))
-                
-                if (configurational_frustration_indices[i,j] > 0.78 or configurational_frustration_indices[i,j] < -1):
-                    pdbi=pdb_indices[i]+pdb_start-1
-                    pdbj=pdb_indices[j]+pdb_start-1
-                    target.write("set sel%d [atomselect top \"resid %d and name CA\"]\n" % (pdbi, pdbi+1))
-                    target.write("set sel%d [atomselect top \"resid %d and name CA\"]\n" % (pdbj, pdbj+1))
-                    target.write("lassign [atomselect%d get {x y z}] pos1\n" % atomselect)
-                    atomselect = atomselect + 1
-                    target.write("lassign [atomselect%d get {x y z}] pos2\n" % atomselect)
-                    atomselect = atomselect + 1
-                    if configurational_frustration_indices[i,j] > 0.78:
-                        target.write("draw color green\n")
-                    else:
-                        target.write("draw color red\n")
-                    target.write("draw line $pos1 $pos2 style solid width 1\n")
-    target.write("mol modselect 0 top \"all\"\n")
-    target.write("mol modstyle 0 top newcartoon\n")
-    target.write("mol modcolor 0 top colorid 15\n")
-    configurational_frustration_output_file.close()
-target.close()
+    #print some frustratometer statistics
+    stat_output = open(stat_output_file_name, "a")
+    stat_output.write("msa_query_sequence " + msa_query_sequence + "\n")
+    stat_output.write("msa_query_sequence_length " + str(len(msa_query_sequence)) + "\n")
+    stat_output.write("pdb_sequence " + pdb_sequence + "\n")
+    stat_output.write("pdb_sequence_length " + str(len(pdb_sequence)) + "\n")
+    stat_output.close()
 
-# Compute and write out mutational frustration indices
-target = open(("%s%s_mutational_frustration.tcl" % (directory, pdbID)), 'w')
-atomselect=0
-if compute_mutational_frustration:
-    status_output.write("Computing mutational frustration...\n")
-    print("Computing mutational frustration...\n")
-    mutational_native_totals, mutational_decoy_means, mutational_decoy_stds, mutational_frustration_indices = evaluate_mutational_frustration(msa_query_sequence, n_decoys, number_of_residues)
-    mutational_frustration_output_file = open(mutational_frustration_output_file_name, "w")
-    for i in range(number_of_residues):
-        for j in range(i+minimum_sequence_separation, number_of_residues):
-            if native_distances[pdb_indices[i], pdb_indices[j]] < max_distance_threshold:
-                mutational_frustration_output_file.write("%4d %s %4d %s %8.2f %8.2f %8.2f %8.2f \n" % (pdb_indices[i]+pdb_start,
-                                                                                                     msa_query_sequence[dca_indices[i]],
-                                                                                                     pdb_indices[j]+pdb_start,
-                                                                                                     msa_query_sequence[dca_indices[j]],
-                                                                                                     mutational_native_totals[i, j],
-                                                                                                     mutational_decoy_means[i, j],
-                                                                                                     mutational_decoy_stds[i, j],
-                                                                                                     mutational_frustration_indices[i, j]))
-                if (mutational_frustration_indices[i,j] > 0.78 or mutational_frustration_indices[i,j] < -1):
-                    pdbi=pdb_indices[i]+pdb_start-1
-                    pdbj=pdb_indices[j]+pdb_start-1
-                    target.write("set sel%d [atomselect top \"resid %d and name CA\"]\n" % (pdbi, pdbi+1))
-                    target.write("set sel%d [atomselect top \"resid %d and name CA\"]\n" % (pdbj, pdbj+1))
-                    target.write("lassign [atomselect%d get {x y z}] pos1\n" % atomselect)
-                    atomselect = atomselect + 1
-                    target.write("lassign [atomselect%d get {x y z}] pos2\n" % atomselect)
-                    atomselect = atomselect + 1
-                    if mutational_frustration_indices[i,j] > 0.78:
-                        target.write("draw color green\n")
-                    else:
-                        target.write("draw color red\n")
-                    target.write("draw line $pos1 $pos2 style solid width 1\n")
-    target.write("mol modselect 0 top \"all\"\n")
-    target.write("mol modstyle 0 top newcartoon\n")
-    target.write("mol modcolor 0 top colorid 15\n")
-    mutational_frustration_output_file.close()
-target.close()
+    # Define parameters
+    number_of_amino_acid_types = 21
+    amino_acid_type_dictionary = {
+    '-':0,
+    'A':1,
+    'C':2,
+    'D':3,
+    'E':4,
+    'F':5,
+    'G':6,
+    'H':7,
+    'I':8,
+    'K':9,
+    'L':10,
+    'M':11,
+    'N':12,
+    'P':13,
+    'Q':14,
+    'R':15,
+    'S':16,
+    'T':17,
+    'V':18,
+    'W':19,
+    'Y':20,
+    'X':0
+    }
 
-# Compute and write out single residue frustration indices
-if compute_single_residue_frustration:
-    status_output.write("Computing single residue frustration...\n")
-    print("Computing single residue frustration...\n")
-    target = open(("%s%s_singleres_frustration.tcl" % (directory, pdbID)), 'w')
-    atomselect = 0
-    single_residue_native_totals, single_residue_decoy_means, single_residue_decoy_stds, single_residue_frustration_indices = evaluate_single_residue_frustration(msa_query_sequence, n_decoys, number_of_residues)
-    single_residue_frustration_output_file = open(single_residue_frustration_output_file_name, "w")
-    for i in range(number_of_residues):
-        single_residue_frustration_output_file.write("%4d %s %8.2f %8.2f %8.2f %8.2f \n" % (pdb_indices[i]+pdb_start,
-                                                                                            msa_query_sequence[dca_indices[i]],
-                                                                                            single_residue_native_totals[i],
-                                                                                            single_residue_decoy_means[i],
-                                                                                            single_residue_decoy_stds[i],
-                                                                                            single_residue_frustration_indices[i]))
-        atomselect = atomselect + 1
-        #temp = 0.5*abs(single_residue_frustration_indices[i])
-        target.write("mol addrep 0\n")
-        target.write("mol modselect %d 0 resid %d\n" % (atomselect, pdb_indices[i]+pdb_start))
-        target.write("mol modstyle %d 0 VDW %f 12.000000\n" % (atomselect, 0.5*abs(single_residue_frustration_indices[i])))
-        target.write("mol modmaterial %d 0 Transparent\n" % atomselect)
-        if single_residue_frustration_indices[i] > 0:
-            target.write("mol modcolor %d 0 ColorID 7\n" % atomselect)
-        else:
-            target.write("mol modcolor %d 0 ColorID 1\n" % atomselect)
-    target.write("mol modselect 0 top \"all\"\n")
-    target.write("mol modstyle 0 top newcartoon\n")
-    target.write("mol modcolor 0 top colorid 15\n")
+
+    # Compute and write out configurational frustration indices
+    target = open(("%s%s_configurational_frustration.tcl" % (directory, pdbID)), 'w')
+    atomselect=0
+    if compute_configurational_frustration:
+        status_output.write("Computing configurational frustration...\n")
+        print("Computing configurational frustration...\n")
+        configurational_native_totals, configurational_decoy_means, configurational_decoy_stds, configurational_frustration_indices = evaluate_configurational_frustration(msa_query_sequence, n_decoys, number_of_residues)
+        configurational_frustration_output_file = open(configurational_frustration_output_file_name, "w")
+        for i in range(number_of_residues):
+            for j in range(i+minimum_sequence_separation, number_of_residues):
+                if native_distances[pdb_indices[i], pdb_indices[j]] < max_distance_threshold:
+                    configurational_frustration_output_file.write("%4d %s %4d %s %8.2f %8.2f %8.2f %8.2f \n" % (pdb_indices[i]+pdb_start,
+                                                                                                         msa_query_sequence[dca_indices[i]],
+                                                                                                         pdb_indices[j]+pdb_start,
+                                                                                                         msa_query_sequence[dca_indices[j]],
+                                                                                                         configurational_native_totals[i, j],
+                                                                                                         configurational_decoy_means[i, j],
+                                                                                                         configurational_decoy_stds[i, j],
+                                                                                                         configurational_frustration_indices[i, j]))
+                    
+                    if (configurational_frustration_indices[i,j] > 0.78 or configurational_frustration_indices[i,j] < -1):
+                        pdbi=pdb_indices[i]+pdb_start-1
+                        pdbj=pdb_indices[j]+pdb_start-1
+                        target.write("set sel%d [atomselect top \"resid %d and name CA\"]\n" % (pdbi, pdbi+1))
+                        target.write("set sel%d [atomselect top \"resid %d and name CA\"]\n" % (pdbj, pdbj+1))
+                        target.write("lassign [atomselect%d get {x y z}] pos1\n" % atomselect)
+                        atomselect = atomselect + 1
+                        target.write("lassign [atomselect%d get {x y z}] pos2\n" % atomselect)
+                        atomselect = atomselect + 1
+                        if configurational_frustration_indices[i,j] > 0.78:
+                            target.write("draw color green\n")
+                        else:
+                            target.write("draw color red\n")
+                        target.write("draw line $pos1 $pos2 style solid width 1\n")
+        target.write("mol modselect 0 top \"all\"\n")
+        target.write("mol modstyle 0 top newcartoon\n")
+        target.write("mol modcolor 0 top colorid 15\n")
+        configurational_frustration_output_file.close()
     target.close()
-    single_residue_frustration_output_file.close()
 
-status_output.close()
+    # Compute and write out mutational frustration indices
+    target = open(("%s%s_mutational_frustration.tcl" % (directory, pdbID)), 'w')
+    atomselect=0
+    if compute_mutational_frustration:
+        status_output.write("Computing mutational frustration...\n")
+        print("Computing mutational frustration...\n")
+        mutational_native_totals, mutational_decoy_means, mutational_decoy_stds, mutational_frustration_indices = evaluate_mutational_frustration(msa_query_sequence, n_decoys, number_of_residues)
+        mutational_frustration_output_file = open(mutational_frustration_output_file_name, "w")
+        for i in range(number_of_residues):
+            for j in range(i+minimum_sequence_separation, number_of_residues):
+                if native_distances[pdb_indices[i], pdb_indices[j]] < max_distance_threshold:
+                    mutational_frustration_output_file.write("%4d %s %4d %s %8.2f %8.2f %8.2f %8.2f \n" % (pdb_indices[i]+pdb_start,
+                                                                                                         msa_query_sequence[dca_indices[i]],
+                                                                                                         pdb_indices[j]+pdb_start,
+                                                                                                         msa_query_sequence[dca_indices[j]],
+                                                                                                         mutational_native_totals[i, j],
+                                                                                                         mutational_decoy_means[i, j],
+                                                                                                         mutational_decoy_stds[i, j],
+                                                                                                         mutational_frustration_indices[i, j]))
+                    if (mutational_frustration_indices[i,j] > 0.78 or mutational_frustration_indices[i,j] < -1):
+                        pdbi=pdb_indices[i]+pdb_start-1
+                        pdbj=pdb_indices[j]+pdb_start-1
+                        target.write("set sel%d [atomselect top \"resid %d and name CA\"]\n" % (pdbi, pdbi+1))
+                        target.write("set sel%d [atomselect top \"resid %d and name CA\"]\n" % (pdbj, pdbj+1))
+                        target.write("lassign [atomselect%d get {x y z}] pos1\n" % atomselect)
+                        atomselect = atomselect + 1
+                        target.write("lassign [atomselect%d get {x y z}] pos2\n" % atomselect)
+                        atomselect = atomselect + 1
+                        if mutational_frustration_indices[i,j] > 0.78:
+                            target.write("draw color green\n")
+                        else:
+                            target.write("draw color red\n")
+                        target.write("draw line $pos1 $pos2 style solid width 1\n")
+        target.write("mol modselect 0 top \"all\"\n")
+        target.write("mol modstyle 0 top newcartoon\n")
+        target.write("mol modcolor 0 top colorid 15\n")
+        mutational_frustration_output_file.close()
+    target.close()
+
+    # Compute and write out single residue frustration indices
+    if compute_single_residue_frustration:
+        status_output.write("Computing single residue frustration...\n")
+        print("Computing single residue frustration...\n")
+        target = open(("%s%s_singleres_frustration.tcl" % (directory, pdbID)), 'w')
+        atomselect = 0
+        single_residue_native_totals, single_residue_decoy_means, single_residue_decoy_stds, single_residue_frustration_indices = evaluate_single_residue_frustration(msa_query_sequence, n_decoys, number_of_residues)
+        single_residue_frustration_output_file = open(single_residue_frustration_output_file_name, "w")
+        for i in range(number_of_residues):
+            single_residue_frustration_output_file.write("%4d %s %8.2f %8.2f %8.2f %8.2f \n" % (pdb_indices[i]+pdb_start,
+                                                                                                msa_query_sequence[dca_indices[i]],
+                                                                                                single_residue_native_totals[i],
+                                                                                                single_residue_decoy_means[i],
+                                                                                                single_residue_decoy_stds[i],
+                                                                                                single_residue_frustration_indices[i]))
+            atomselect = atomselect + 1
+            #temp = 0.5*abs(single_residue_frustration_indices[i])
+            target.write("mol addrep 0\n")
+            target.write("mol modselect %d 0 resid %d\n" % (atomselect, pdb_indices[i]+pdb_start))
+            target.write("mol modstyle %d 0 VDW %f 12.000000\n" % (atomselect, 0.5*abs(single_residue_frustration_indices[i])))
+            target.write("mol modmaterial %d 0 Transparent\n" % atomselect)
+            if single_residue_frustration_indices[i] > 0:
+                target.write("mol modcolor %d 0 ColorID 7\n" % atomselect)
+            else:
+                target.write("mol modcolor %d 0 ColorID 1\n" % atomselect)
+        target.write("mol modselect 0 top \"all\"\n")
+        target.write("mol modstyle 0 top newcartoon\n")
+        target.write("mol modcolor 0 top colorid 15\n")
+        target.close()
+        single_residue_frustration_output_file.close()
+
+    status_output.close()
